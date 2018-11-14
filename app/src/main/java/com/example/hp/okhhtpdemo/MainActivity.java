@@ -1,5 +1,7 @@
 package com.example.hp.okhhtpdemo;
 
+import android.app.Dialog;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
@@ -23,20 +25,38 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
-    private  String url="http://api.expoon.com/AppNews/getNewsList/type/1/";
-    private int p=1;
+    private String url = "http://api.expoon.com/AppNews/getNewsList/type/1/";
+    private int p = 1;
     private SmartRefreshLayout smartRefreshLayout;
     private RecyclerView recyclerView;
     private List<NewsBean.DataBean> data;
     private MyAdapter myAdapter;
-    private final  int pageSize=10;
+    private final int pageSize = 10;
+    private Dialog dialog;
+
     @Override
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        smartRefreshLayout=findViewById(R.id.smart);
-        recyclerView=findViewById(R.id.recycler_view);
-        getServerFrom();
+
+        Log.e(TAG, "onCreate: " + "onCreat");
+        smartRefreshLayout = findViewById(R.id.smart);
+        recyclerView = findViewById(R.id.recycler_view);
+        WeiboDialogUtils.showprogress(MainActivity.this, "正在加载中......", true);
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                /**
+                 * 因为是启动界面  所以会有所延时  在其他界面是没有任何问题的
+                 */
+               WeiboDialogUtils.dismissprogress();
+               getServerFrom();
+
+            }
+        },1000);
+
+
         smartRefreshLayout.setOnLoadmoreListener(new OnLoadmoreListener() {
             @Override
             public void onLoadmore(RefreshLayout refreshlayout) {
@@ -50,11 +70,8 @@ public class MainActivity extends AppCompatActivity {
                         smartRefreshLayout.resetNoMoreData();
 
 
-
-
-
                     }
-                },1000);
+                }, 1000);
 
             }
         });
@@ -65,65 +82,79 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         int itemCount = myAdapter.getItemCount();
-                        if(pageSize<data.size())
-                        {
+                        if (itemCount == data.size()) {
+
+                            smartRefreshLayout.finishLoadmoreWithNoMoreData();
+                            //smartRefreshLayout.resetNoMoreData();
+
+                        } else {
                             p++;
                             getServerFrom();
                             smartRefreshLayout.finishLoadmore();
                         }
-                        else
-                        {
-                            smartRefreshLayout.finishLoadmoreWithNoMoreData();
-                        }
-
 
 
                     }
-                },1000);
+                }, 1000);
             }
         });
 
 
     }
 
-    private  void  getServerFrom()
-    {
+    @Override
+    protected void onStart() {
+        super.onStart();
+       // WeiboDialogUtils.showprogress(MainActivity.this, "正在加载中......", true);
+    }
 
-        OkHttpClient client=new OkHttpClient.Builder()
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // WeiboDialogUtils.showprogress(MainActivity.this,"正在加载中......",true);
+    }
+
+    private void getServerFrom() {
+
+
+        OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10,TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
                 .build();
-        StringBuffer buffer=new StringBuffer(url);
+        StringBuffer buffer = new StringBuffer(url);
         StringBuffer append = buffer.append("p").append("/").append(p);
-        String url1=url+append;
-        Log.e(TAG, "onCreate: "+url1 );
+        String url1 = url + append;
+        Log.e(TAG, "onCreate: " + url1);
 
         final Request request = new Request.Builder().url(url1).get().build();
+
         Call call = client.newCall(request);
+        Log.e(TAG, "getServerFrom: " + call);
         call.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-
+                Log.e(TAG, "onFailure: "+"onFailure" );
+                // WeiboDialogUtils.closeDialog(dialog);
+                WeiboDialogUtils.dismissprogress();
 
 
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                Gson gson=new Gson();
+                // WeiboDialogUtils.closeDialog(dialog);
+                Log.e(TAG, "onResponse: "+"onResponse" );
+
+                Gson gson = new Gson();
                 final NewsBean newsBean = gson.fromJson(response.body().string(), NewsBean.class);
                 runOnUiThread(new Runnable() {
-
-
-
-
                     @Override
                     public void run() {
-                        LinearLayoutManager linearLayoutManager=new LinearLayoutManager(MainActivity.this);
+                        WeiboDialogUtils.dismissprogress();
+                        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(MainActivity.this);
                         recyclerView.setLayoutManager(linearLayoutManager);
                         data = newsBean.getData();
-
-                        myAdapter = new MyAdapter(newsBean.getData(),MainActivity.this);
+                        myAdapter = new MyAdapter(newsBean.getData(), MainActivity.this);
                         recyclerView.setAdapter(myAdapter);
                         // myAdapter.notifyDataSetChanged();
 
